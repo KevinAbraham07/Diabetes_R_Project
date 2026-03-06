@@ -19,6 +19,13 @@ library(corrplot)
 # --------------------------------
 
 data <- read.csv("data/diabetes_binary_5050split_health_indicators_BRFSS2015.csv")
+# Convert binary variables to factors
+data$Diabetes_binary <- factor(data$Diabetes_binary)
+data$Smoker <- factor(data$Smoker)
+data$PhysActivity <- factor(data$PhysActivity)
+data$Fruits <- factor(data$Fruits)
+data$Veggies <- factor(data$Veggies)
+data$HvyAlcoholConsump <- factor(data$HvyAlcoholConsump)
 
 head(data)
 dim(data)
@@ -49,8 +56,9 @@ colSums(is.na(data))
 
 table(data$Diabetes_binary)
 
-ggplot(data, aes(x = factor(Diabetes_binary))) +
+ggplot(data, aes(x = Diabetes_binary)) +
   geom_bar(fill = "steelblue") +
+  theme_minimal() +
   labs(
     title = "Distribution of Diabetes Cases",
     x = "Diabetes Status",
@@ -58,32 +66,33 @@ ggplot(data, aes(x = factor(Diabetes_binary))) +
   )
 
 
-
 # --------------------------------
-# Step 6: BMI Analysis
+# Step 6: BMI Distribution
 # --------------------------------
 
-ggplot(data, aes(x = factor(Diabetes_binary), y = BMI)) +
-  geom_boxplot(fill = "orange") +
+ggplot(data, aes(x = BMI)) +
+  geom_histogram(fill = "skyblue", bins = 30) +
+  theme_minimal() +
   labs(
-    title = "BMI vs Diabetes",
+    title = "Distribution of BMI in Survey Population",
+    x = "BMI",
+    y = "Count"
+  )
+
+
+# --------------------------------
+# Step 7: BMI vs Diabetes
+# --------------------------------
+
+ggplot(data, aes(x = Diabetes_binary, y = BMI, fill = Diabetes_binary)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(
+    title = "BMI vs Diabetes Status",
     x = "Diabetes Status",
     y = "BMI"
-  )
-
-
-
-# --------------------------------
-# Step 7: Physical Activity Analysis
-# --------------------------------
-
-ggplot(data, aes(x = factor(PhysActivity), fill = factor(Diabetes_binary))) +
-  geom_bar(position = "fill") +
-  labs(
-    title = "Physical Activity vs Diabetes",
-    x = "Physical Activity",
-    y = "Proportion"
-  )
+  ) +
+  guides(fill = "none")
 
 
 
@@ -136,23 +145,39 @@ ggplot(data, aes(x = factor(Age), fill = factor(Diabetes_binary))) +
   )
 
 
-
 # --------------------------------
 # Step 11: Correlation Analysis
 # --------------------------------
 
-cor_matrix <- cor(data)
+# Reset plotting device
+dev.off()
 
-corrplot(cor_matrix, method = "color")
+# Select only numeric columns
+numeric_data <- data %>% select(where(is.numeric))
 
+# Compute correlation matrix
+cor_matrix <- cor(numeric_data)
 
+# Plot heatmap
+corrplot(
+  cor_matrix,
+  method = "color",
+  type = "upper",
+  order = "hclust",
+  tl.cex = 0.6,
+  tl.col = "black"
+)
 
 # --------------------------------
 # Step 12: Logistic Regression Model
 # --------------------------------
 
+# Convert Diabetes variable back to numeric 0/1
+data$Diabetes_binary_num <- as.numeric(as.character(data$Diabetes_binary))
+
 model <- glm(
-  Diabetes_binary ~ BMI + Age + PhysActivity + Smoker + HvyAlcoholConsump + Fruits + Veggies,
+  Diabetes_binary_num ~ BMI + Age + PhysActivity + Smoker +
+    HvyAlcoholConsump + Fruits + Veggies,
   data = data,
   family = binomial
 )
