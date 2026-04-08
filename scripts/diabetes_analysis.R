@@ -3,7 +3,7 @@
 # ====================================================
 
 # Note: You may need to install the following packages if you don't have them:
-# install.packages(c("ggplot2", "dplyr", "corrplot", "caret", "pROC", "randomForest", "patchwork"))
+# install.packages(c("ggplot2", "dplyr", "corrplot", "caret", "pROC", "randomForest", "patchwork", "e1071", "rpart", "kknn"))
 
 # --------------------------------
 # Step 1: Load Required Libraries
@@ -15,6 +15,9 @@ library(caret)
 library(pROC)
 library(randomForest)
 library(patchwork)
+library(e1071)
+library(rpart)
+library(kknn)
 
 # --------------------------------
 # Step 2: Load the Dataset
@@ -130,18 +133,54 @@ summary(model_lr)
 # print(summary(model_lr$residuals))
 
 # --------------------------------
-# Step 15: Random Forest Model Training (Comparison)
+# Step 15: Multi-Model Training (RF, SVM, Tree, kNN)
 # --------------------------------
-train_subset <- train_data[sample(1:nrow(train_data), 10000), ] 
+# Note: SVM and kNN can be computationally expensive on large datasets, 
+# so we use'train_subset' (10,000 samples) for these models.
+
+cat("\n--- Training Multiple Models ---\n")
+
+# A. Random Forest
 model_rf <- randomForest(Diabetes_binary ~ BMI + HighBP + Age + Lifestyle_Score, 
                          data = train_subset, ntree = 100)
-cat("\n--- Random Forest Model Trained (Subset of 10k) ---\n")
+cat("Random Forest: [OK]\n")
+
+# B. Support Vector Machine (SVM)
+model_svm <- svm(Diabetes_binary ~ BMI + HighBP + Age + Lifestyle_Score, 
+                 data = train_subset, probability = TRUE)
+cat("SVM: [OK]\n")
+
+# C. Decision Tree
+model_tree <- rpart(Diabetes_binary ~ BMI + HighBP + Age + Lifestyle_Score, 
+                    data = train_data, method = "class")
+cat("Decision Tree: [OK]\n")
+
+# D. k-Nearest Neighbors (kNN)
+# Using caret's train function for convenience
+model_knn <- train(Diabetes_binary ~ BMI + HighBP + Age + Lifestyle_Score, 
+                   data = train_subset, method = "knn", 
+                   tuneLength = 5, trControl = trainControl(method="cv"))
+cat("kNN: [OK]\n")
 
 # --------------------------------
-# Step 16: Model Performance on Test Data
+# Step 16: Model Performance & Predictions
 # --------------------------------
+# Logistic Regression Predictions
 lr_probs <- predict(model_lr, newdata = test_data, type = "response")
 lr_preds <- factor(ifelse(lr_probs > 0.5, 1, 0), levels = c(0, 1))
+
+# RF Predictions
+rf_probs <- predict(model_rf, newdata = test_data, type = "prob")[,2]
+
+# SVM Predictions
+svm_pred_raw <- predict(model_svm, newdata = test_data, probability = TRUE)
+svm_probs <- attr(svm_pred_raw, "probabilities")[,2]
+
+# Decision Tree Predictions
+tree_probs <- predict(model_tree, newdata = test_data, type = "prob")[,2]
+
+# kNN Predictions
+knn_probs <- predict(model_knn, newdata = test_data, type = "prob")[,2]
 
 # --------------------------------
 # Step 17: Confusion Matrix Visualization
@@ -209,13 +248,29 @@ print(coeffs[nrow(coeffs), ])
 # Step 24: Multi-Model ROC Comparison
 # --------------------------------
 cat("\n--- Visualizing Model Comparison (ROC Curves) ---\n")
-rf_probs <- predict(model_rf, newdata = test_data, type = "prob")[,2]
-roc_rf <- roc(test_data$Diabetes_binary, rf_probs)
+roc_rf   <- roc(test_data$Diabetes_binary, rf_probs)
+roc_svm  <- roc(test_data$Diabetes_binary, svm_probs)
+roc_tree <- roc(test_data$Diabetes_binary, tree_probs)
+roc_knn  <- roc(test_data$Diabetes_binary, knn_probs)
 
-plot(roc_obj, col = "blue", main = "Multi-Model ROC Comparison")
+plot(roc_obj, col = "blue", main = "High-Fidelity Model Comparison")
 plot(roc_rf, add = TRUE, col = "red")
-legend("bottomright", legend = c("Logistic Regression", "Random Forest"), 
-       col = c("blue", "red"), lwd = 2)
+plot(roc_svm, add = TRUE, col = "green")
+plot(roc_tree, add = TRUE, col = "orange")
+plot(roc_knn, add = TRUE, col = "purple")
+
+legend("bottomright", 
+       legend = c("Logistic Reg", "Random Forest", "SVM", "Decision Tree", "kNN"), 
+       col = c("blue", "red", "green", "orange", "purple"), lwd = 2, cex = 0.8)
+
+# --------------------------------
+# Step 24b: AUC Summary Table
+# --------------------------------
+auc_results <- data.frame(
+  Model = c("Logistic Regression", "Random Forest", "SVM", "Decision Tree", "kNN"),
+  AUC = c(auc(roc_obj), auc(roc_rf), auc(roc_svm), auc(roc_tree), auc(roc_knn))
+)
+print(auc_results)
 
 # --------------------------------
 # Step 25: Model Calibration Analysis
