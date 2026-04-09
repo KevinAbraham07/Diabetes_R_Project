@@ -137,6 +137,10 @@ summary(model_lr)
 # --------------------------------
 # Note: SVM and kNN can be computationally expensive on large datasets, 
 # so we use'train_subset' (10,000 samples) for these models.
+set.seed(123)
+
+train_subset <- train_data %>%
+  sample_n(10000)
 
 cat("\n--- Training Multiple Models ---\n")
 
@@ -261,7 +265,7 @@ plot(roc_knn, add = TRUE, col = "purple")
 
 legend("bottomright", 
        legend = c("Logistic Reg", "Random Forest", "SVM", "Decision Tree", "kNN"), 
-       col = c("blue", "red", "green", "orange", "purple"), lwd = 2, cex = 0.8)
+       col = c("blue", "red", "green", "orange", "purple"), lwd = 2, cex = 0.6)
 
 # --------------------------------
 # Step 24b: AUC Summary Table
